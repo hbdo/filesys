@@ -9,6 +9,7 @@ void compare(char* fname1, char* fname2);
 void rname(char* oldname, char* newname);
 void copy(char* fname1, char* fname2);
 void quit();
+int countDiff(int blockNum1, int blockNum2);
 
 char input[BUFFSIZE];
 char* cmd;
@@ -74,6 +75,69 @@ int main(int* argc, char** argv){
 }
 
 void compare(char* fname1, char* fname2){
+    char itype;
+	int blocks[3];
+	_directory_entry _directory_entries[4];
+
+	int i,j;
+	int e_inode;
+
+    int fname1_inode = -1;
+    int fname2_inode = -1;
+
+    int diff = 0;
+	// read inode entry for current directory
+	// in FS304, an inode can point to three blocks at the most
+	itype = _inode_table[CD_INODE_ENTRY].TT[0];
+	blocks[0] = stoi(_inode_table[CD_INODE_ENTRY].XX,2);
+	blocks[1] = stoi(_inode_table[CD_INODE_ENTRY].YY,2);
+	blocks[2] = stoi(_inode_table[CD_INODE_ENTRY].ZZ,2);
+
+	// its a directory; so the following should never happen
+	if (itype=='F') {
+		printf("Fatal Error! Aborting.\n");
+		exit(1);
+	}
+
+	// lets traverse the directory entries in all three blocks
+	for (i=0; i<3; i++) {
+		if (blocks[i]==0) continue;	// 0 means pointing at nothing
+
+		readFS304(blocks[i],(char *)_directory_entries);	// lets read a directory entry; notice the cast
+
+		// so, we got four possible directory entries now
+		for (j=0; j<4; j++) {
+			if (_directory_entries[j].F=='0') continue;	// means unused entry
+
+			e_inode = stoi(_directory_entries[j].MMM,3);	// this is the inode that has more info about this entry
+
+			if (_inode_table[e_inode].TT[0]=='F')  { // entry is for a file
+				if(strcmp(_directory_entries[j].fname, fname1) == 0){
+                    fname1_inode = e_inode;
+                }
+                if(strcmp(_directory_entries[j].fname, fname2) == 0){
+                    fname2_inode = e_inode;
+                }
+			}
+		}
+
+        if(fname1_inode == -1){
+            printf("File name not found: %s\n", fname1);
+            return;
+        }
+
+        if(fname2_inode == -1){
+            printf("File name not found: %s\n", fname2);
+            return;
+        }
+
+        diff += countDiff(stoi(_inode_table[fname1_inode].XX,2), stoi(_inode_table[fname2_inode].XX,2));
+        diff += countDiff(stoi(_inode_table[fname1_inode].YY,2), stoi(_inode_table[fname2_inode].YY,2));
+        diff += countDiff(stoi(_inode_table[fname1_inode].ZZ,2), stoi(_inode_table[fname2_inode].ZZ,2));
+
+        printf("The files have %d differences in total\n", diff);
+	}
+
 
 }
 
@@ -87,4 +151,18 @@ void copy(char* fname1, char* fname2){
 
 void quit(){
     exit(0);
+}
+
+int countDiff(int blockNum1, int blockNum2){
+    char block1[1024];
+    char block2[1024];
+    int diff = 0;
+    readFS304(blockNum1, block1);
+    readFS304(blockNum2, block2);
+
+    for(int i=0; i<1024;i++){
+        diff += block1[i] == block2[i] ? 0 : 1;
+    }
+
+    return diff;
 }
