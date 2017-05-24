@@ -4,16 +4,17 @@
 #include "errno.h"
 #include "fs304.h"
 #define BUFFSIZE 1024
-#define METHOD_COUNT 8
+#define METHOD_COUNT 9
 void compare(char* fname1, char* fname2);
 void rname(char* oldname, char* newname);
 void copy(char* fname1, char* fname2);
+void quit();
 
 char input[BUFFSIZE];
 char* cmd;
 char* args[2];
-char *commands[8] = {"ls", "rd", "stats", "cd", "md", "compare", "rename", "copy"};
-void (*funcs[8]) = {ls, rd, stats, cd, md, compare, rname, copy};
+char *commands[METHOD_COUNT] = {"ls", "rd", "stats", "exit", "cd", "md", "compare", "rename", "copy"};
+void (*funcs[METHOD_COUNT]) = {ls, rd, stats, quit, cd, md, compare, rname, copy};
 //char
 typedef struct _func_t {
     char* name;
@@ -31,7 +32,7 @@ int main(int* argc, char** argv){
         func_t new_func;
         new_func.name = commands[i];
         new_func.func = funcs[i];
-        new_func.argcount = i<5?(i<3?0:1):2;
+        new_func.argcount = i<6?(i<4?0:1):2;
         methods[i] = new_func;
     }
     /*
@@ -84,3 +85,6 @@ void copy(char* fname1, char* fname2){
 
 }
 
+void quit(){
+    exit(0);
+}
