@@ -120,29 +120,94 @@ void compare(char* fname1, char* fname2){
                 }
 			}
 		}
-
-        if(fname1_inode == -1){
-            printf("File name not found: %s\n", fname1);
-            return;
-        }
-
-        if(fname2_inode == -1){
-            printf("File name not found: %s\n", fname2);
-            return;
-        }
-
-        diff += countDiff(stoi(_inode_table[fname1_inode].XX,2), stoi(_inode_table[fname2_inode].XX,2));
-        diff += countDiff(stoi(_inode_table[fname1_inode].YY,2), stoi(_inode_table[fname2_inode].YY,2));
-        diff += countDiff(stoi(_inode_table[fname1_inode].ZZ,2), stoi(_inode_table[fname2_inode].ZZ,2));
-
-        printf("The files have %d differences in total\n", diff);
 	}
 
+
+    if(fname1_inode == -1){
+        printf("File name not found: %s\n", fname1);
+        return;
+    }
+
+    if(fname2_inode == -1){
+        printf("File name not found: %s\n", fname2);
+        return;
+    }
+
+    diff += countDiff(stoi(_inode_table[fname1_inode].XX,2), stoi(_inode_table[fname2_inode].XX,2));
+    diff += countDiff(stoi(_inode_table[fname1_inode].YY,2), stoi(_inode_table[fname2_inode].YY,2));
+    diff += countDiff(stoi(_inode_table[fname1_inode].ZZ,2), stoi(_inode_table[fname2_inode].ZZ,2));
+
+    printf("The files have %d differences in total\n", diff);
 
 }
 
 void rname(char* oldname, char* newname){
+    char itype;
+	int blocks[3];
+	_directory_entry _directory_entries[4];
+    
+	int i,j;
+	int e_inode;
 
+    int oldname_exists = -1;
+    int newname_exists = -1;
+
+    int blockIdx;
+    int dirIdx;
+	// read inode entry for current directory
+	// in FS304, an inode can point to three blocks at the most
+	itype = _inode_table[CD_INODE_ENTRY].TT[0];
+	blocks[0] = stoi(_inode_table[CD_INODE_ENTRY].XX,2);
+	blocks[1] = stoi(_inode_table[CD_INODE_ENTRY].YY,2);
+	blocks[2] = stoi(_inode_table[CD_INODE_ENTRY].ZZ,2);
+
+	// its a directory; so the following should never happen
+	if (itype=='F') {
+		printf("Fatal Error! Aborting.\n");
+		exit(1);
+	}
+
+	// lets traverse the directory entries in all three blocks
+	for (i=0; i<3; i++) {
+		if (blocks[i]==0) continue;	// 0 means pointing at nothing
+
+		readFS304(blocks[i],(char *)_directory_entries);	// lets read a directory entry; notice the cast
+
+		// so, we got four possible directory entries now
+		for (j=0; j<4; j++) {
+			if (_directory_entries[j].F=='0') continue;	// means unused entry
+
+			e_inode = stoi(_directory_entries[j].MMM,3);	// this is the inode that has more info about this entry
+
+            if(strcmp(_directory_entries[j].fname, oldname) == 0){
+                oldname_exists = 1;
+                blockIdx = i;
+                dirIdx = j;
+            }
+
+            if(strcmp(_directory_entries[j].fname, newname) == 0){
+                newname_exists = 1;
+            }
+            
+		}
+	}
+
+
+    if(oldname_exists == -1){
+        printf("File/directory name not found: %s\n", oldname);
+        return;
+    }
+
+    if(newname_exists != -1){
+        printf("File/directory name already exists: %s\n", newname);
+        return;
+    }
+
+    readFS304(blocks[blockIdx],(char *)_directory_entries);
+    memset((void*) _directory_entries[dirIdx].fname,0,sizeof(char)*252);
+    strcpy(_directory_entries[dirIdx].fname, newname);
+    writeFS304(blocks[blockIdx], (char *) _directory_entries);
+    ls();
 }
 
 void copy(char* fname1, char* fname2){
@@ -150,6 +215,8 @@ void copy(char* fname1, char* fname2){
 }
 
 void quit(){
+    fflush(df);
+    fclose(df);
     exit(0);
 }
 
